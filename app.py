@@ -63,7 +63,7 @@ def monhistogramme():
     return render_template("histogramme.html")
 
 @app.route("/atelier")
-def monhistogramme():
+def atelier():
     return render_template("atelier.html")
 
 # Ne rien mettre après ce commentaire
