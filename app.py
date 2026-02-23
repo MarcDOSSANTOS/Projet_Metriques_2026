@@ -1,5 +1,6 @@
 import requests
-from flask import Flask, jsonify, render_template
+# Ajout de 'request' à la liste des imports
+from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
 
@@ -7,17 +8,33 @@ app = Flask(__name__)
 def hello_world():
     return render_template('hello.html')
 
-# Déposez votre code à partir d'ici :
+# --- Déposez votre code à partir d'ici : ---
 
-@app.route("/contact")
+# Ajout de methods=["GET", "POST"] pour autoriser la réception du formulaire
+@app.route("/contact", methods=["GET", "POST"])
 def MaPremiereAPI():
-    return "<h2>Ma page de contact</h2>"  
+    # Si l'utilisateur a cliqué sur "Envoyer" (Méthode POST)
+    if request.method == "POST":
+        prenom = request.form.get("prenom")
+        nom = request.form.get("nom")
+        message = request.form.get("message")
+        
+        # On ouvre un fichier (il sera créé automatiquement s'il n'existe pas)
+        with open("messages.txt", "a", encoding="utf-8") as fichier:
+            fichier.write(f"De: {prenom} {nom}\n")
+            fichier.write(f"Message: {message}\n")
+            fichier.write("-" * 30 + "\n")
+            
+        # Message de confirmation basique affiché à l'écran
+        return "Merci ! Votre message a bien été enregistré."
+        
+    # Si l'utilisateur arrive simplement sur la page (Méthode GET)
+    return render_template('contact.html')
 
-#Requête API pour météo 
+# --- Requête API pour météo --- 
 
 @app.get("/paris")
 def api_paris():
-    
     url = "https://api.open-meteo.com/v1/forecast?latitude=48.8566&longitude=2.3522&hourly=temperature_2m"
     response = requests.get(url)
     data = response.json()
@@ -33,7 +50,19 @@ def api_paris():
 
     return jsonify(result)
 
+# --- Requête api pour graphique --- 
+
+@app.route("/rapport")
+def mongraphique():
+    return render_template("graphique.html")
+
+# --- Requête api pour histogramme ---
+
+@app.route("/histogramme")
+def monhistogramme():
+    return render_template("histogramme.html")
+
 # Ne rien mettre après ce commentaire
     
 if __name__ == "__main__":
-  app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
