@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Météo - Design Avancé</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #0b1120; /* Bleu très sombre */
+            --card-bg: #1e293b;  /* Bleu ardoise pour les cartes */
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-1: #06b6d4; /* Cyan */
+            --accent-2: #10b981; /* Emeraude */
+            --accent-3: #8b5cf6; /* Violet */
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Red Hat Display', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 30px;
+            min-height: 100vh;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(to right, var(--accent-1), var(--accent-3));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        /* --- Grille du Dashboard --- */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* --- Style des Cartes --- */
+        .chart-card {
+            background-color: var(--card-bg);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .chart-header {
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 15px;
+        }
+
+        .chart-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .chart-location {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+
+        /* Conteneur pour forcer la taille du canvas */
+        .canvas-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        /* Loader */
+        .loader {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Observatoire Météorologique</h1>
+        <p class="subtitle">Analyse multi-paramètres en temps réel</p>
+    </header>
+
+    <div class="dashboard-grid">
+        <div class="chart-card">
+            <div class="chart-header">
+                <h2 class="chart-title">Vitesse du Vent par Altitude</h2>
+                <div class="chart-location">📍 Marseille, France</div>
+            </div>
+            <div class="canvas-container">
+                <div id="loader1" class="loader">Chargement...</div>
+                <canvas id="chartWind"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h2 class="chart-title">Humidité & Sols</h2>
+                <div class="chart-location">📍 Versailles, France</div>
+            </div>
+            <div class="canvas-container">
+                <div id="loader2" class="loader">Chargement...</div>
+                <canvas id="chartMoisture"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h2 class="chart-title">Pression Atmosphérique</h2>
+                <div class="chart-location">📍 Lille, France</div>
+            </div>
+            <div class="canvas-container">
+                <div id="loader3" class="loader">Chargement...</div>
+                <canvas id="chartPressure"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration globale de Chart.js pour coller au thème Dark ---
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = "'Red Hat Display', sans-serif";
+        Chart.defaults.scale.grid.color = 'rgba(255, 255, 255, 0.05)';
+        Chart.defaults.elements.point.radius = 0; // Cache les points pour des lignes plus fluides
+        Chart.defaults.elements.point.hitRadius = 10; // Garde l'interactivité au survol
+        Chart.defaults.elements.line.tension = 0.4; // Courbes adoucies
+
+        // Fonction pour formater les dates (ex: "14/02 08:00")
+        function formatDates(isoArray) {
+            return isoArray.map(isoString => {
+                const date = new Date(isoString);
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                return `${day}/${month} ${hours}:00`;
+            });
+        }
+
+        // --- 1. Graphique Marseille (Vents) ---
+        async function loadWindChart() {
+            try {
+                const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=43.297&longitude=5.3811&hourly=wind_speed_180m,wind_speed_120m,wind_speed_80m,wind_speed_10m&past_days=7');
+                const data = await res.json();
+                
+                document.getElementById('loader1').style.display = 'none';
+                const ctx = document.getElementById('chartWind').getContext('2d');
+                
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: formatDates(data.hourly.time),
+                        datasets: [
+                            { label: 'Vent 180m', data: data.hourly.wind_speed_180m, borderColor: '#06b6d4', borderWidth: 2 },
+                            { label: 'Vent 120m', data: data.hourly.wind_speed_120m, borderColor: '#3b82f6', borderWidth: 2 },
+                            { label: 'Vent 80m', data: data.hourly.wind_speed_80m, borderColor: '#8b5cf6', borderWidth: 2 },
+                            { label: 'Vent 10m', data: data.hourly.wind_speed_10m, borderColor: '#f43f5e', borderWidth: 2 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }
+                    }
+                });
+            } catch (err) { console.error(err); }
+        }
+
+        // --- 2. Graphique Versailles (Humidité et Sols) ---
+        async function loadMoistureChart() {
+            try {
+                const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=48.8036&longitude=2.1342&hourly=relative_humidity_2m,soil_moisture_0_to_1cm,soil_moisture_1_to_3cm,soil_moisture_3_to_9cm,soil_moisture_9_to_27cm,soil_moisture_27_to_81cm&past_days=7');
+                const data = await res.json();
+                
+                document.getElementById('loader2').style.display = 'none';
+                const ctx = document.getElementById('chartMoisture').getContext('2d');
+                
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: formatDates(data.hourly.time),
+                        datasets: [
+                            { label: 'Humidité Air (2m)', data: data.hourly.relative_humidity_2m, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true },
+                            { label: 'Sol 0-1cm', data: data.hourly.soil_moisture_0_to_1cm, borderColor: '#f59e0b', borderDash: [5, 5] },
+                            { label: 'Sol 1-3cm', data: data.hourly.soil_moisture_1_to_3cm, borderColor: '#d97706', borderDash: [5, 5] },
+                            { label: 'Sol 27-81cm', data: data.hourly.soil_moisture_27_to_81cm, borderColor: '#78350f', borderDash: [5, 5] }
+                            // J'ai masqué 3-9cm et 9-27cm pour ne pas surcharger visuellement, mais on peut les ajouter facilement.
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }
+                    }
+                });
+            } catch (err) { console.error(err); }
+        }
+
+        // --- 3. Graphique Lille (Pression) ---
+        async function loadPressureChart() {
+            try {
+                const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=50.633&longitude=3.0586&hourly=pressure_msl');
+                const data = await res.json();
+                
+                document.getElementById('loader3').style.display = 'none';
+                const ctx = document.getElementById('chartPressure').getContext('2d');
+                
+                // Création d'un dégradé sous la courbe
+                let gradient = ctx.createLinearGradient(0, 0, 0, 300);
+                gradient.addColorStop(0, 'rgba(139, 92, 246, 0.5)'); // Violet semi-transparent
+                gradient.addColorStop(1, 'rgba(139, 92, 246, 0.0)'); // Transparent
+                
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: formatDates(data.hourly.time),
+                        datasets: [{
+                            label: 'Pression MSL (hPa)',
+                            data: data.hourly.pressure_msl,
+                            borderColor: '#8b5cf6',
+                            backgroundColor: gradient,
+                            borderWidth: 3,
+                            fill: true // Remplit la zone sous la courbe
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { legend: { position: 'bottom' } },
+                        scales: {
+                            y: {
+                                // On ne commence pas à zéro pour bien voir les variations de pression
+                                min: Math.min(...data.hourly.pressure_msl) - 5,
+                                max: Math.max(...data.hourly.pressure_msl) + 5
+                            }
+                        }
+                    }
+                });
+            } catch (err) { console.error(err); }
+        }
+
+        // Lancement des 3 requêtes en même temps au chargement de la page
+        window.addEventListener('DOMContentLoaded', () => {
+            loadWindChart();
+            loadMoistureChart();
+            loadPressureChart();
+        });
+    </script>
+</body>
+</html>
